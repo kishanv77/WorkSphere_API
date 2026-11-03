@@ -19,7 +19,9 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -62,6 +64,16 @@ public class GlobalExceptionHandler {
                 ? exception.getMessage()
                 : "A record with one of these unique values already exists";
         return response(HttpStatus.CONFLICT, message, request, Map.of());
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    ResponseEntity<ApiError> handleUnknownRoute(HttpServletRequest request) {
+        return response(HttpStatus.NOT_FOUND, "Resource not found", request, Map.of());
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    ResponseEntity<ApiError> handleMethodNotAllowed(HttpServletRequest request) {
+        return response(HttpStatus.METHOD_NOT_ALLOWED, "HTTP method not supported for this path", request, Map.of());
     }
 
     @ExceptionHandler(Exception.class)
