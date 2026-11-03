@@ -1,47 +1,44 @@
 # WorkSphere API
 
-Week 1 of the WorkSphere multi-tenant SaaS backend. It provides tenant registration, password-based login, JWT access tokens, and an authenticated identity endpoint.
+WorkSphere multi-tenant SaaS backend: tenant registration, JWT login, tenant-scoped projects and tasks.
 
 ## Prerequisites
 
-- JDK 25 on your `PATH` (`java -version`)
-- Docker Desktop with Docker Compose (`docker compose version`)
-- Git (optional, for source control)
+- JDK 25 (`java -version`). If `JAVA_HOME` points at another JDK, set it to JDK 25 for the session.
+- PostgreSQL 18 running natively on `localhost:5432`
+- Maven Wrapper (included; no separate Maven install needed)
+- Git
 
-The Maven Wrapper downloads Maven automatically; a separate Maven installation is not required.
+## Native PostgreSQL setup (primary)
+
+Create the role and database once, as a PostgreSQL superuser (for example with `psql -U postgres`):
+
+```sql
+CREATE ROLE worksphere_app LOGIN PASSWORD '<choose-a-local-password>';
+CREATE DATABASE worksphere OWNER worksphere_app;
+```
+
+Flyway creates the schema on first startup. Hibernate only validates it (`ddl-auto=validate`).
 
 ## Local configuration
 
-The application never stores secrets in source control. Set environment variables in the current PowerShell session before starting Docker or Spring Boot. Replace every angle-bracket value with your own local development value.
+Set these in the PowerShell session that runs the app. Never commit real values or `.env` files.
 
 ```powershell
-$env:POSTGRES_USER = "<your-local-db-user>"
-$env:POSTGRES_PASSWORD = "<your-local-db-password>"
-$env:DB_USERNAME = $env:POSTGRES_USER
-$env:DB_PASSWORD = $env:POSTGRES_PASSWORD
-$env:JWT_SECRET = "<a-long-random-value-of-at-least-32-bytes>"
+$env:DB_URL = "jdbc:postgresql://localhost:5432/worksphere"
+$env:DB_USERNAME = "worksphere_app"
+$env:DB_PASSWORD = "<your-local-db-password>"
+$env:JWT_SECRET = "<base64-random-value-of-at-least-32-bytes>"
 ```
 
-Optional variables:
+Generate a secret with: `[Convert]::ToBase64String((1..48 | ForEach-Object { Get-Random -Maximum 256 }) -as [byte[]])`
 
-- `POSTGRES_DB` — defaults to `worksphere`.
-- `POSTGRES_PORT` — defaults to `5432`.
-- `DB_URL` — defaults to `jdbc:postgresql://localhost:5432/worksphere`.
+### Optional: Docker
 
-Do not commit `.env` files, database passwords, or JWT secrets. The `.gitignore` file excludes `.env`-style files.
-
-## Start PostgreSQL
-
-```powershell
-docker compose up -d
-docker compose ps
-```
-
-Compose creates one PostgreSQL 18 container and a named `postgres-data` volume. The database is available to Spring Boot at `localhost:5432` by default. The volume retains data when the container is stopped; use `docker compose down -v` only when you intentionally want to remove local database data.
-
+`compose.yaml` can start PostgreSQL in a container (`docker compose up -d`) if Docker is available. It is not required; the native setup above is the supported default.
 ## Start the application
 
-After setting the environment variables and starting PostgreSQL:
+After setting the environment variables:
 
 ```powershell
 .\mvnw.cmd spring-boot:run
@@ -97,6 +94,34 @@ Authorization: Bearer <access-token>
 
 The response includes user ID, tenant ID, email, first name, last name, and role. Tenant identity comes from the verified token, never from a request parameter.
 
+### Projects (Bearer token required; tenant comes from the token only)
+
+```powershell
+$h = @{ Authorization = "Bearer $token" }
+$p = Invoke-RestMethod -Method Post http://127.0.0.1:8080/api/v1/projects -Headers $h -ContentType 'application/json' -Body '{"name":"Website Redesign","description":"Q4"}'
+Invoke-RestMethod http://127.0.0.1:8080/api/v1/projects -Headers $h
+Invoke-RestMethod http://127.0.0.1:8080/api/v1/projects/$($p.id) -Headers $h
+Invoke-RestMethod -Method Patch http://127.0.0.1:8080/api/v1/projects/$($p.id) -Headers $h -ContentType 'application/json' -Body '{"name":"Renamed"}'
+Invoke-RestMethod -Method Patch http://127.0.0.1:8080/api/v1/projects/$($p.id)/archive -Headers $h
+```
+
+Duplicate names (case-insensitive) within a tenant return `409`. Another tenant's project returns `404`. Archiving is idempotent and projects are never physically deleted.
+
+### Tasks
+
+```powershell
+$t = Invoke-RestMethod -Method Post http://127.0.0.1:8080/api/v1/tasks -Headers $h -ContentType 'application/json' -Body (@{ projectId = $p.id; title = "Draft wireframes"; priority = "HIGH"; dueDate = "2026-12-01" } | ConvertTo-Json)
+Invoke-RestMethod "http://127.0.0.1:8080/api/v1/tasks?projectId=$($p.id)&status=TODO" -Headers $h
+Invoke-RestMethod http://127.0.0.1:8080/api/v1/tasks/$($t.id) -Headers $h
+Invoke-RestMethod -Method Patch http://127.0.0.1:8080/api/v1/tasks/$($t.id) -Headers $h -ContentType 'application/json' -Body '{"title":"Wireframes v2"}'
+Invoke-RestMethod -Method Patch http://127.0.0.1:8080/api/v1/tasks/$($t.id)/status -Headers $h -ContentType 'application/json' -Body '{"status":"IN_PROGRESS"}'
+```
+
+- `POST /api/v1/tasks` needs `projectId` and `title`; optional `assigneeId` (a user in your tenant), `description`, `priority` (`LOW|MEDIUM|HIGH`, default `MEDIUM`), `dueDate`. Tasks start as `TODO`.
+- `PATCH /api/v1/tasks/{id}` is a partial update; send `"unassign": true` or `"clearDueDate": true` to clear those fields.
+- List filters: `projectId`, `status` (`TODO|IN_PROGRESS|DONE`), `assigneeId`.
+- Unknown or other-tenant project/assignee/task IDs return `404`; adding tasks to an archived project returns `409`.
+
 ## Consistent errors
 
 Errors use one JSON shape:
@@ -119,10 +144,10 @@ The API returns `400` for invalid input, `401` for failed/missing authentication
 ## Run tests
 
 ```powershell
-.\mvnw.cmd test
+.\mvnw.cmd test "-Dtest=ProjectServiceTests,TaskServiceTests"
 ```
 
-The integration tests use Testcontainers to start a temporary PostgreSQL 18 container, apply Flyway migrations, and verify registration, duplicate handling, login, authentication, and `/me`. Docker Desktop must be running for these tests.
+The Mockito service tests need no database or Docker. The existing Testcontainers integration tests (`AuthFlowIntegrationTests`, `WorksphereApiApplicationTests`) require Docker Desktop and **cannot run on machines without virtualization**; they are kept but were not executed locally.
 
 ## Security notes
 
@@ -134,9 +159,4 @@ The integration tests use Testcontainers to start a temporary PostgreSQL 18 cont
 
 ## Manual testing with Postman or VS Code REST Client
 
-1. Run PostgreSQL and the application using the steps above.
-2. Send the registration request and copy `userId`/`tenantId` from the response.
-3. Send the login request and copy `accessToken`.
-4. Send `GET /api/v1/auth/me` with `Authorization: Bearer <accessToken>`.
-5. Confirm `/me` returns the same user and tenant IDs created during registration.
-6. Repeat registration with the same email or slug to confirm a `409 Conflict` response.
+Open [`docs/api-tests.http`](docs/api-tests.http) with the VS Code *REST Client* extension (or copy the requests into Postman) and run top to bottom. It covers register, login, `/me`, projects, tasks, and a cross-tenant isolation section where tenant B must receive `404`/empty lists for tenant A's data. Change the slugs/emails between runs to avoid `409` on re-registration.
