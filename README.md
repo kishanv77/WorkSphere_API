@@ -133,6 +133,26 @@ Invoke-RestMethod -Method Patch http://127.0.0.1:8080/api/v1/tasks/$($t.id)/stat
 - **Roles:** `TENANT_ADMIN` can create, update and archive projects and manage users. `MEMBER` can read projects and users and create, update and change the status of tasks. Forbidden actions return a JSON `403`.
 - **Pagination:** `GET /api/v1/projects`, `/tasks` and `/users` accept `page` (zero-based, default `0`) and `size` (default `20`, maximum `100`; larger values are clamped). The response is still a plain JSON array; the total number of matching records is in the `X-Total-Count` response header. Example: `curl.exe -i "http://127.0.0.1:8080/api/v1/projects?page=0&size=2" -H "Authorization: Bearer <token>"`.
 
+### Task comments, dashboard and task permissions
+
+- `POST /api/v1/tasks/{taskId}/comments` (body `{ "body": "..." }`, max 2000 chars) and `GET /api/v1/tasks/{taskId}/comments` (paged, oldest first, `X-Total-Count`): any authenticated user in the tenant. Comments on another tenant's task return `404`.
+- `GET /api/v1/dashboard`: `tasksByStatus`, `overdueTasks` (due before today and not `DONE`), `myOpenTasks` (assigned to you, not `DONE`), `activeProjects`, `archivedProjects`, `activeMembers`. Always scoped to your tenant.
+- **Task permissions:** `TENANT_ADMIN` can change any task. A `MEMBER` can edit a task or change its status only if they created it or are assigned to it; otherwise `403`.
+- **Immediate deactivation:** every request re-checks that the token's user is still active, so a deactivated user's token stops working at once (`401`).
+- **CORS:** browsers may call `/api/**` from the origins in `app.cors.allowed-origins` (default `http://localhost:5173`). `X-Total-Count` is exposed to the browser.
+
+## Web app (frontend)
+
+A React + TypeScript + Vite + Tailwind client lives in [`frontend/`](frontend/README.md). With the API running:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Then open http://localhost:5173. It needs Node.js 22 or newer.
+
 ## Consistent errors
 
 Errors use one JSON shape:
@@ -165,7 +185,7 @@ The Mockito service tests need no database or Docker. The existing Testcontainer
 - Access tokens are signed HMAC JWTs and expire after 15 minutes by default.
 - Send tokens only as `Authorization: Bearer <token>`.
 - Use a unique JWT secret of at least 32 bytes; production secrets belong in a secret manager or deployment environment, never Git.
-- The app is stateless: it does not create login sessions or use refresh tokens in Week 1.
+- The app is stateless: it does not create login sessions or use refresh tokens.
 - BCrypt hashes passwords; the raw password and hash are never included in API responses.
 
 ## Manual testing with Postman or VS Code REST Client

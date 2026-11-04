@@ -1,6 +1,7 @@
 package com.worksphere.project.repository;
 
 import com.worksphere.project.domain.Project;
+import com.worksphere.project.domain.ProjectStatus;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -11,6 +12,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ProjectRepository extends JpaRepository<Project, UUID> {
 
     List<Project> findAllByTenant_IdOrderByCreatedAtDesc(UUID tenantId);
+
+    long countByTenant_IdAndStatus(UUID tenantId, ProjectStatus status);
 
     Page<Project> findAllByTenant_Id(UUID tenantId, Pageable pageable);
 

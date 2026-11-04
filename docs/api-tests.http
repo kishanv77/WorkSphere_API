@@ -227,3 +227,26 @@ Authorization: Bearer {{tokenA}}
 ###
 GET {{baseUrl}}/api/v1/users?page=0&size=10
 Authorization: Bearer {{tokenA}}
+
+### ---- Comments and dashboard ----
+### 32. Add a comment
+POST {{baseUrl}}/api/v1/tasks/{{taskId}}/comments
+Authorization: Bearer {{tokenA}}
+Content-Type: application/json
+
+{ "body": "Looks good to me" }
+
+### 33. List comments
+GET {{baseUrl}}/api/v1/tasks/{{taskId}}/comments
+Authorization: Bearer {{tokenA}}
+
+### 34. Dashboard
+GET {{baseUrl}}/api/v1/dashboard
+Authorization: Bearer {{tokenA}}
+
+### 35. B comments on A's task -> expect 404
+POST {{baseUrl}}/api/v1/tasks/{{taskId}}/comments
+Authorization: Bearer {{tokenB}}
+Content-Type: application/json
+
+{ "body": "should not work" }

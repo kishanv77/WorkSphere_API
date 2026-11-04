@@ -37,6 +37,10 @@ public class Task {
     @JoinColumn(name = "assignee_id")
     private UserAccount assignee;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by_id", updatable = false)
+    private UserAccount createdBy;
+
     @Column(nullable = false, length = 200)
     private String title;
 
@@ -81,6 +85,13 @@ public class Task {
         return new Task(tenant, project, assignee, title, description, priority, dueDate);
     }
 
+    public static Task createTodo(Tenant tenant, Project project, UserAccount assignee, UserAccount createdBy,
+            String title, String description, TaskPriority priority, LocalDate dueDate) {
+        Task task = new Task(tenant, project, assignee, title, description, priority, dueDate);
+        task.createdBy = createdBy;
+        return task;
+    }
+
     public void updateDetails(Project project, UserAccount assignee, String title, String description,
             TaskPriority priority, LocalDate dueDate) {
         this.project = project;
@@ -121,6 +132,10 @@ public class Task {
 
     public UserAccount getAssignee() {
         return assignee;
+    }
+
+    public UserAccount getCreatedBy() {
+        return createdBy;
     }
 
     public String getTitle() {
