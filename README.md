@@ -27,7 +27,7 @@ Set these in the PowerShell session that runs the app. Never commit real values 
 ```powershell
 $env:DB_URL = "jdbc:postgresql://localhost:5432/worksphere"
 $env:DB_USERNAME = "worksphere_app"
-$env:DB_PASSWORD = "<your-local-db-password>"
+$env:DB_PASSWORD = "DaRkKnIgHt@7"
 $env:JWT_SECRET = "<base64-random-value-of-at-least-32-bytes>"
 ```
 
