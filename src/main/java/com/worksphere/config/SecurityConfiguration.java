@@ -39,6 +39,8 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register-tenant", "/api/v1/auth/login")
                         .permitAll()
                         .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/users").hasRole("TENANT_ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/users/**").hasRole("TENANT_ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();

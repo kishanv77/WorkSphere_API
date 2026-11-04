@@ -109,6 +109,18 @@ class TaskServiceTests {
     }
 
     @Test
+    void createFailsForDeactivatedAssignee() {
+        assignee.deactivate();
+        when(projectRepository.findByIdAndTenant_Id(project.getId(), tenant.getId())).thenReturn(Optional.of(project));
+        when(userAccountRepository.findByIdAndTenant_Id(assignee.getId(), tenant.getId()))
+                .thenReturn(Optional.of(assignee));
+
+        assertThrows(ResourceNotFoundException.class, () -> service.create(principal,
+                new CreateTaskRequest(project.getId(), assignee.getId(), "T", null, null, null)));
+        verify(taskRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void listIsTenantScoped() {
         when(taskRepository.findAll(any(Specification.class), any(Sort.class))).thenReturn(List.of(existingTask()));
