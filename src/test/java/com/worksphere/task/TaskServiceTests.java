@@ -34,7 +34,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import tools.jackson.databind.json.JsonMapper;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -123,12 +125,13 @@ class TaskServiceTests {
     @Test
     @SuppressWarnings("unchecked")
     void listIsTenantScoped() {
-        when(taskRepository.findAll(any(Specification.class), any(Sort.class))).thenReturn(List.of(existingTask()));
+        when(taskRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(existingTask())));
 
-        List<TaskResponse> result = service.list(principal, null, null, null);
+        Page<TaskResponse> result = service.list(principal, null, null, null, 0, 20);
 
-        assertEquals(1, result.size());
-        verify(taskRepository).findAll(any(Specification.class), any(Sort.class));
+        assertEquals(1, result.getTotalElements());
+        verify(taskRepository).findAll(any(Specification.class), any(Pageable.class));
     }
 
     @Test

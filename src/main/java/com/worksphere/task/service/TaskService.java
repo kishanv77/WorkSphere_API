@@ -1,6 +1,7 @@
 package com.worksphere.task.service;
 
 import com.worksphere.auth.security.JwtPrincipal;
+import com.worksphere.common.api.PageRequests;
 import com.worksphere.common.exception.ConflictException;
 import com.worksphere.common.exception.ResourceNotFoundException;
 import com.worksphere.project.domain.Project;
@@ -20,6 +21,7 @@ import com.worksphere.user.repository.UserAccountRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -64,7 +66,8 @@ public class TaskService {
     }
 
     @Transactional(readOnly = true)
-    public List<TaskResponse> list(JwtPrincipal principal, UUID projectId, TaskStatus status, UUID assigneeId) {
+    public Page<TaskResponse> list(
+            JwtPrincipal principal, UUID projectId, TaskStatus status, UUID assigneeId, int page, int size) {
         UUID tenantId = principal.tenantId();
         List<Specification<Task>> filters = new ArrayList<>();
         filters.add((root, query, cb) -> cb.equal(root.get("tenant").get("id"), tenantId));
@@ -77,10 +80,9 @@ public class TaskService {
         if (assigneeId != null) {
             filters.add((root, query, cb) -> cb.equal(root.get("assignee").get("id"), assigneeId));
         }
-        return taskRepository.findAll(Specification.allOf(filters), Sort.by(Sort.Direction.DESC, "createdAt"))
-                .stream()
-                .map(TaskResponse::from)
-                .toList();
+        return taskRepository
+                .findAll(Specification.allOf(filters), PageRequests.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")))
+                .map(TaskResponse::from);
     }
 
     @Transactional(readOnly = true)

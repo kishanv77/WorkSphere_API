@@ -3,6 +3,7 @@ package com.worksphere.project;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -28,6 +29,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 @ExtendWith(MockitoExtension.class)
 class ProjectServiceTests {
@@ -73,12 +77,13 @@ class ProjectServiceTests {
     @Test
     void listReturnsOnlyCurrentTenantProjects() {
         Project mine = Project.createActive(tenant, "Mine", null);
-        when(projectRepository.findAllByTenant_IdOrderByCreatedAtDesc(tenant.getId())).thenReturn(List.of(mine));
+        when(projectRepository.findAllByTenant_Id(eq(tenant.getId()), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(mine)));
 
-        List<ProjectResponse> result = service.list(principal);
+        Page<ProjectResponse> result = service.list(principal, 0, 20);
 
-        assertEquals(1, result.size());
-        assertEquals("Mine", result.get(0).name());
+        assertEquals(1, result.getTotalElements());
+        assertEquals("Mine", result.getContent().get(0).name());
     }
 
     @Test

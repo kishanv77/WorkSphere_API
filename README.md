@@ -128,6 +128,11 @@ Invoke-RestMethod -Method Patch http://127.0.0.1:8080/api/v1/tasks/$($t.id)/stat
 - `GET /api/v1/users`, `GET /api/v1/users/{userId}`: any authenticated user, tenant-scoped (`404` across tenants).
 - `PATCH /api/v1/users/{userId}/deactivate` (`TENANT_ADMIN` only): idempotent; an admin cannot deactivate themselves (`409`). Deactivated users cannot log in or be assigned tasks. An already issued access token stays valid until it expires (15 minutes).
 
+### Roles and pagination
+
+- **Roles:** `TENANT_ADMIN` can create, update and archive projects and manage users. `MEMBER` can read projects and users and create, update and change the status of tasks. Forbidden actions return a JSON `403`.
+- **Pagination:** `GET /api/v1/projects`, `/tasks` and `/users` accept `page` (zero-based, default `0`) and `size` (default `20`, maximum `100`; larger values are clamped). The response is still a plain JSON array; the total number of matching records is in the `X-Total-Count` response header. Example: `curl.exe -i "http://127.0.0.1:8080/api/v1/projects?page=0&size=2" -H "Authorization: Bearer <token>"`.
+
 ## Consistent errors
 
 Errors use one JSON shape:

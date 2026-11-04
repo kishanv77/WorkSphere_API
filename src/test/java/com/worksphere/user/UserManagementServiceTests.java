@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -29,6 +30,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
@@ -82,10 +85,10 @@ class UserManagementServiceTests {
 
     @Test
     void listIsTenantScoped() {
-        when(userAccountRepository.findAllByTenant_IdOrderByCreatedAtAsc(tenant.getId()))
-                .thenReturn(List.of(admin));
+        when(userAccountRepository.findAllByTenant_Id(eq(tenant.getId()), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(admin)));
 
-        assertEquals(1, service.list(principal).size());
+        assertEquals(1, service.list(principal, 0, 20).getTotalElements());
     }
 
     @Test

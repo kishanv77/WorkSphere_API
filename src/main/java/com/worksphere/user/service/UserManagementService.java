@@ -1,6 +1,7 @@
 package com.worksphere.user.service;
 
 import com.worksphere.auth.security.JwtPrincipal;
+import com.worksphere.common.api.PageRequests;
 import com.worksphere.common.exception.ConflictException;
 import com.worksphere.common.exception.DuplicateResourceException;
 import com.worksphere.common.exception.ResourceNotFoundException;
@@ -10,9 +11,10 @@ import com.worksphere.user.api.CreateUserRequest;
 import com.worksphere.user.api.UserResponse;
 import com.worksphere.user.domain.UserAccount;
 import com.worksphere.user.repository.UserAccountRepository;
-import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,10 +55,10 @@ public class UserManagementService {
     }
 
     @Transactional(readOnly = true)
-    public List<UserResponse> list(JwtPrincipal principal) {
-        return userAccountRepository.findAllByTenant_IdOrderByCreatedAtAsc(principal.tenantId()).stream()
-                .map(UserResponse::from)
-                .toList();
+    public Page<UserResponse> list(JwtPrincipal principal, int page, int size) {
+        return userAccountRepository
+                .findAllByTenant_Id(principal.tenantId(), PageRequests.of(page, size, Sort.by(Sort.Direction.ASC, "createdAt")))
+                .map(UserResponse::from);
     }
 
     @Transactional(readOnly = true)
