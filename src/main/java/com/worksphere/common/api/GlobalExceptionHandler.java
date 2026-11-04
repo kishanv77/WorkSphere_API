@@ -1,6 +1,7 @@
 package com.worksphere.common.api;
 
 import com.worksphere.common.exception.AuthenticationInvalidException;
+import com.worksphere.common.exception.ConflictException;
 import com.worksphere.common.exception.DuplicateResourceException;
 import com.worksphere.common.exception.InvalidCredentialsException;
 import com.worksphere.common.exception.ResourceNotFoundException;
@@ -18,6 +19,9 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -32,6 +36,11 @@ public class GlobalExceptionHandler {
             fieldErrors.putIfAbsent(fieldError.getField(), fieldError.getDefaultMessage());
         }
         return response(HttpStatus.BAD_REQUEST, "Request validation failed", request, fieldErrors);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException exception, HttpServletRequest request) {
+        return response(HttpStatus.BAD_REQUEST, "Invalid value for parameter '" + exception.getName() + "'", request, Map.of());
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -49,12 +58,22 @@ public class GlobalExceptionHandler {
         return response(HttpStatus.NOT_FOUND, exception.getMessage(), request, Map.of());
     }
 
-    @ExceptionHandler({DuplicateResourceException.class, DataIntegrityViolationException.class})
+    @ExceptionHandler({DuplicateResourceException.class, ConflictException.class, DataIntegrityViolationException.class})
     ResponseEntity<ApiError> handleConflict(RuntimeException exception, HttpServletRequest request) {
-        String message = exception instanceof DuplicateResourceException
+        String message = exception instanceof DuplicateResourceException || exception instanceof ConflictException
                 ? exception.getMessage()
                 : "A record with one of these unique values already exists";
         return response(HttpStatus.CONFLICT, message, request, Map.of());
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    ResponseEntity<ApiError> handleUnknownRoute(HttpServletRequest request) {
+        return response(HttpStatus.NOT_FOUND, "Resource not found", request, Map.of());
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    ResponseEntity<ApiError> handleMethodNotAllowed(HttpServletRequest request) {
+        return response(HttpStatus.METHOD_NOT_ALLOWED, "HTTP method not supported for this path", request, Map.of());
     }
 
     @ExceptionHandler(Exception.class)
