@@ -207,3 +207,23 @@ Authorization: Bearer {{tokenB}}
 ### 29. A deactivates member
 PATCH {{baseUrl}}/api/v1/users/{{memberId}}/deactivate
 Authorization: Bearer {{tokenA}}
+
+### ---- Roles and pagination ----
+### 30. Member creates a project -> expect 403
+POST {{baseUrl}}/api/v1/projects
+Authorization: Bearer {{tokenM}}
+Content-Type: application/json
+
+{ "name": "Not allowed" }
+
+### 31. Paged lists (X-Total-Count header holds the total)
+GET {{baseUrl}}/api/v1/projects?page=0&size=2
+Authorization: Bearer {{tokenA}}
+
+###
+GET {{baseUrl}}/api/v1/tasks?page=0&size=5&status=TODO
+Authorization: Bearer {{tokenA}}
+
+###
+GET {{baseUrl}}/api/v1/users?page=0&size=10
+Authorization: Bearer {{tokenA}}

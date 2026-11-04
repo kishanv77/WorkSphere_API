@@ -1,6 +1,7 @@
 package com.worksphere.task.api;
 
 import com.worksphere.auth.security.JwtPrincipal;
+import com.worksphere.common.api.PageRequests;
 import com.worksphere.task.domain.TaskStatus;
 import com.worksphere.task.service.TaskService;
 import jakarta.validation.Valid;
@@ -35,12 +36,14 @@ public class TaskController {
     }
 
     @GetMapping
-    public List<TaskResponse> list(
+    public ResponseEntity<List<TaskResponse>> list(
             @AuthenticationPrincipal JwtPrincipal principal,
             @RequestParam(required = false) UUID projectId,
             @RequestParam(required = false) TaskStatus status,
-            @RequestParam(required = false) UUID assigneeId) {
-        return taskService.list(principal, projectId, status, assigneeId);
+            @RequestParam(required = false) UUID assigneeId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return PageRequests.ok(taskService.list(principal, projectId, status, assigneeId, page, size));
     }
 
     @GetMapping("/{taskId}")

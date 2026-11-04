@@ -1,6 +1,7 @@
 package com.worksphere.project.service;
 
 import com.worksphere.auth.security.JwtPrincipal;
+import com.worksphere.common.api.PageRequests;
 import com.worksphere.common.exception.DuplicateResourceException;
 import com.worksphere.common.exception.ResourceNotFoundException;
 import com.worksphere.project.api.CreateProjectRequest;
@@ -10,8 +11,9 @@ import com.worksphere.project.domain.Project;
 import com.worksphere.project.repository.ProjectRepository;
 import com.worksphere.tenant.domain.Tenant;
 import com.worksphere.tenant.repository.TenantRepository;
-import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,10 +44,10 @@ public class ProjectService {
     }
 
     @Transactional(readOnly = true)
-    public List<ProjectResponse> list(JwtPrincipal principal) {
-        return projectRepository.findAllByTenant_IdOrderByCreatedAtDesc(principal.tenantId()).stream()
-                .map(ProjectResponse::from)
-                .toList();
+    public Page<ProjectResponse> list(JwtPrincipal principal, int page, int size) {
+        return projectRepository
+                .findAllByTenant_Id(principal.tenantId(), PageRequests.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")))
+                .map(ProjectResponse::from);
     }
 
     @Transactional(readOnly = true)
