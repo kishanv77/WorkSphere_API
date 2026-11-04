@@ -1,6 +1,8 @@
 package com.worksphere.auth.security;
 
 import com.worksphere.common.security.RestAuthenticationEntryPoint;
+import com.worksphere.user.domain.UserStatus;
+import com.worksphere.user.repository.UserAccountRepository;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -23,10 +25,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
+    private final UserAccountRepository userAccountRepository;
 
-    public JwtAuthenticationFilter(JwtService jwtService, RestAuthenticationEntryPoint authenticationEntryPoint) {
+    public JwtAuthenticationFilter(
+            JwtService jwtService,
+            RestAuthenticationEntryPoint authenticationEntryPoint,
+            UserAccountRepository userAccountRepository) {
         this.jwtService = jwtService;
         this.authenticationEntryPoint = authenticationEntryPoint;
+        this.userAccountRepository = userAccountRepository;
     }
 
     @Override
@@ -47,6 +54,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             JwtPrincipal principal = jwtService.parseAccessToken(authorization.substring(BEARER_PREFIX.length()));
+            if (!userAccountRepository.existsByIdAndTenant_IdAndStatus(
+                    principal.userId(), principal.tenantId(), UserStatus.ACTIVE)) {
+                SecurityContextHolder.clearContext();
+                authenticationEntryPoint.commence(
+                        request, response, new BadCredentialsException("User is no longer active"));
+                return;
+            }
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                     principal,
                     null,

@@ -16,6 +16,7 @@ import com.worksphere.task.domain.TaskPriority;
 import com.worksphere.task.domain.TaskStatus;
 import com.worksphere.task.repository.TaskRepository;
 import com.worksphere.user.domain.UserAccount;
+import com.worksphere.user.domain.UserRole;
 import com.worksphere.user.domain.UserStatus;
 import com.worksphere.user.repository.UserAccountRepository;
 import java.util.ArrayList;
@@ -24,6 +25,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,6 +60,7 @@ public class TaskService {
                 project.getTenant(),
                 project,
                 assignee,
+                userAccountRepository.getReferenceById(principal.userId()),
                 request.title(),
                 blankToNull(request.description()),
                 request.priority() != null ? request.priority() : TaskPriority.MEDIUM,
@@ -94,6 +97,7 @@ public class TaskService {
     public TaskResponse update(JwtPrincipal principal, UUID taskId, UpdateTaskRequest request) {
         UUID tenantId = principal.tenantId();
         Task task = findTask(tenantId, taskId);
+        requireCanModify(principal, task);
 
         Project project = task.getProject();
         if (request.projectId() != null && !request.projectId().equals(project.getId())) {
@@ -123,6 +127,7 @@ public class TaskService {
     @Transactional
     public TaskResponse updateStatus(JwtPrincipal principal, UUID taskId, UpdateTaskStatusRequest request) {
         Task task = findTask(principal.tenantId(), taskId);
+        requireCanModify(principal, task);
         task.changeStatus(request.status());
         return TaskResponse.from(taskRepository.saveAndFlush(task));
     }
@@ -141,6 +146,19 @@ public class TaskService {
         return userAccountRepository.findByIdAndTenant_Id(assigneeId, tenantId)
                 .filter(user -> user.getStatus() == UserStatus.ACTIVE)
                 .orElseThrow(() -> new ResourceNotFoundException(ASSIGNEE_NOT_FOUND));
+    }
+
+    /** Admins may change any task; members only tasks they created or are assigned to. */
+    private static void requireCanModify(JwtPrincipal principal, Task task) {
+        if (principal.role() == UserRole.TENANT_ADMIN) {
+            return;
+        }
+        UUID userId = principal.userId();
+        boolean isAssignee = task.getAssignee() != null && userId.equals(task.getAssignee().getId());
+        boolean isCreator = task.getCreatedBy() != null && userId.equals(task.getCreatedBy().getId());
+        if (!isAssignee && !isCreator) {
+            throw new AccessDeniedException("You can only change tasks you created or are assigned to");
+        }
     }
 
     private static void requireActive(Project project) {
