@@ -55,20 +55,30 @@ public class UserAccount {
     protected UserAccount() {
     }
 
-    private UserAccount(Tenant tenant, String firstName, String lastName, String email, String passwordHash) {
+    private UserAccount(
+            Tenant tenant, String firstName, String lastName, String email, String passwordHash, UserRole role) {
         this.id = UUID.randomUUID();
         this.tenant = tenant;
         this.firstName = firstName;
         this.lastName = lastName;
         this.email = email;
         this.passwordHash = passwordHash;
-        this.role = UserRole.TENANT_ADMIN;
+        this.role = role;
         this.status = UserStatus.ACTIVE;
     }
 
     public static UserAccount createActiveTenantAdmin(
             Tenant tenant, String firstName, String lastName, String email, String passwordHash) {
-        return new UserAccount(tenant, firstName, lastName, email, passwordHash);
+        return new UserAccount(tenant, firstName, lastName, email, passwordHash, UserRole.TENANT_ADMIN);
+    }
+
+    public static UserAccount createActiveMember(
+            Tenant tenant, String firstName, String lastName, String email, String passwordHash) {
+        return new UserAccount(tenant, firstName, lastName, email, passwordHash, UserRole.MEMBER);
+    }
+
+    public void deactivate() {
+        this.status = UserStatus.INACTIVE;
     }
 
     @PrePersist

@@ -167,3 +167,43 @@ Content-Type: application/json
 ### 23. B lists tasks -> expect []
 GET {{baseUrl}}/api/v1/tasks
 Authorization: Bearer {{tokenB}}
+### ---- User management ----
+### 24. A creates a member
+# @name createMember
+POST {{baseUrl}}/api/v1/users
+Authorization: Bearer {{tokenA}}
+Content-Type: application/json
+
+{ "firstName": "Mia", "lastName": "Member", "email": "mia@tenant-a.test", "password": "{{password}}" }
+
+###
+@memberId = {{createMember.response.body.id}}
+
+### 25. List users
+GET {{baseUrl}}/api/v1/users
+Authorization: Bearer {{tokenA}}
+
+### 26. Member logs in
+# @name loginMember
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{ "email": "mia@tenant-a.test", "password": "{{password}}" }
+
+###
+@tokenM = {{loginMember.response.body.accessToken}}
+
+### 27. Member creates a user -> expect 403
+POST {{baseUrl}}/api/v1/users
+Authorization: Bearer {{tokenM}}
+Content-Type: application/json
+
+{ "firstName": "X", "lastName": "Y", "email": "x@tenant-a.test", "password": "{{password}}" }
+
+### 28. B reads A's member -> expect 404
+GET {{baseUrl}}/api/v1/users/{{memberId}}
+Authorization: Bearer {{tokenB}}
+
+### 29. A deactivates member
+PATCH {{baseUrl}}/api/v1/users/{{memberId}}/deactivate
+Authorization: Bearer {{tokenA}}

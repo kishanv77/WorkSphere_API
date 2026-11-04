@@ -15,6 +15,7 @@ import com.worksphere.task.domain.TaskPriority;
 import com.worksphere.task.domain.TaskStatus;
 import com.worksphere.task.repository.TaskRepository;
 import com.worksphere.user.domain.UserAccount;
+import com.worksphere.user.domain.UserStatus;
 import com.worksphere.user.repository.UserAccountRepository;
 import java.util.ArrayList;
 import java.util.List;
@@ -136,6 +137,7 @@ public class TaskService {
 
     private UserAccount findAssignee(UUID tenantId, UUID assigneeId) {
         return userAccountRepository.findByIdAndTenant_Id(assigneeId, tenantId)
+                .filter(user -> user.getStatus() == UserStatus.ACTIVE)
                 .orElseThrow(() -> new ResourceNotFoundException(ASSIGNEE_NOT_FOUND));
     }
 

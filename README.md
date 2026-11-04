@@ -122,6 +122,12 @@ Invoke-RestMethod -Method Patch http://127.0.0.1:8080/api/v1/tasks/$($t.id)/stat
 - List filters: `projectId`, `status` (`TODO|IN_PROGRESS|DONE`), `assigneeId`.
 - Unknown or other-tenant project/assignee/task IDs return `404`; adding tasks to an archived project returns `409`.
 
+### Users (tenant team management)
+
+- `POST /api/v1/users` (`TENANT_ADMIN` only; `403` for others): creates an active `MEMBER` in your tenant. Body: `firstName`, `lastName`, `email`, `password` (12-72 chars). Role and tenant are never taken from the request. Duplicate email returns `409`.
+- `GET /api/v1/users`, `GET /api/v1/users/{userId}`: any authenticated user, tenant-scoped (`404` across tenants).
+- `PATCH /api/v1/users/{userId}/deactivate` (`TENANT_ADMIN` only): idempotent; an admin cannot deactivate themselves (`409`). Deactivated users cannot log in or be assigned tasks. An already issued access token stays valid until it expires (15 minutes).
+
 ## Consistent errors
 
 Errors use one JSON shape:
