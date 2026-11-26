@@ -1,6 +1,7 @@
 package com.worksphere.user.service;
 
 import com.worksphere.auth.security.JwtPrincipal;
+import com.worksphere.auth.service.RefreshTokenService;
 import com.worksphere.common.api.PageRequests;
 import com.worksphere.common.exception.ConflictException;
 import com.worksphere.common.exception.DuplicateResourceException;
@@ -27,14 +28,17 @@ public class UserManagementService {
     private final UserAccountRepository userAccountRepository;
     private final TenantRepository tenantRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenService refreshTokenService;
 
     public UserManagementService(
             UserAccountRepository userAccountRepository,
             TenantRepository tenantRepository,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder,
+            RefreshTokenService refreshTokenService) {
         this.userAccountRepository = userAccountRepository;
         this.tenantRepository = tenantRepository;
         this.passwordEncoder = passwordEncoder;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @Transactional
@@ -66,7 +70,7 @@ public class UserManagementService {
         return UserResponse.from(find(principal, userId));
     }
 
-    /** Idempotent. An admin cannot deactivate their own account. */
+    /** Idempotent. An admin cannot deactivate their own account. Ends all of the user's sessions. */
     @Transactional
     public UserResponse deactivate(JwtPrincipal principal, UUID userId) {
         if (principal.userId().equals(userId)) {
@@ -74,6 +78,7 @@ public class UserManagementService {
         }
         UserAccount user = find(principal, userId);
         user.deactivate();
+        refreshTokenService.revokeAllFor(user.getId());
         return UserResponse.from(userAccountRepository.saveAndFlush(user));
     }
 

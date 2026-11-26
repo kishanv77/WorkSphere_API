@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { api, tokenStore } from '../api/client'
+import { api, refreshSession, tokenStore } from '../api/client'
 import type { Me } from '../api/types'
 
 interface RegisterInput {
@@ -24,13 +24,12 @@ const AuthContext = createContext<AuthState | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Me | null>(null)
-  const [loading, setLoading] = useState<boolean>(tokenStore.get() !== null)
+  const [loading, setLoading] = useState<boolean>(true)
 
+  // Restore the session after a reload: the refresh cookie (if any) yields a new access token.
   useEffect(() => {
-    if (tokenStore.get() === null) return
-    api
-      .get<Me>('/api/v1/auth/me')
-      .then(setUser)
+    refreshSession()
+      .then((ok) => (ok ? api.get<Me>('/api/v1/auth/me').then(setUser) : undefined))
       .catch(() => tokenStore.clear())
       .finally(() => setLoading(false))
   }, [])
@@ -58,6 +57,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     tokenStore.clear()
     setUser(null)
+    // Revoke the refresh token server-side; the UI is already signed out either way.
+    api.post('/api/v1/auth/logout').catch(() => undefined)
   }, [])
 
   const value = useMemo(

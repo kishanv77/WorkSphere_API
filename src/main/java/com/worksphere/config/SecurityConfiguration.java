@@ -21,7 +21,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 @EnableWebSecurity
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class, RefreshTokenProperties.class})
 public class SecurityConfiguration {
 
     @Bean
@@ -42,7 +42,7 @@ public class SecurityConfiguration {
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/register-tenant", "/api/v1/auth/login")
+                        .requestMatchers(HttpMethod.POST, JwtAuthenticationFilter.PUBLIC_AUTH_PATHS)
                         .permitAll()
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/projects").hasRole("TENANT_ADMIN")
@@ -62,6 +62,7 @@ public class SecurityConfiguration {
         configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         configuration.setExposedHeaders(List.of("X-Total-Count"));
+        configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", configuration);

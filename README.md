@@ -82,7 +82,14 @@ The response is `201 Created` and contains safe tenant/user identifiers. The fir
 }
 ```
 
-The response contains an access token, `Bearer` token type, and expiry timestamp. The JWT contains the user ID, tenant ID, and role claims.
+The response contains an access token, `Bearer` token type, and expiry timestamp. The JWT contains the user ID, tenant ID, and role claims. The response also sets a refresh token cookie (`ws_refresh`: `HttpOnly`, `Secure`, `SameSite=Strict`, path `/api/v1/auth`, valid 7 days).
+
+After 5 failed logins for one email, or 20 from one client address, within 15 minutes, further attempts return `429 Too Many Requests` with a `Retry-After` header (in seconds). The counters are kept in memory per instance. Behind a reverse proxy, set `server.forward-headers-strategy=native` so the real client address is used.
+
+### Refresh and log out
+
+- `POST /api/v1/auth/refresh` (no bearer token needed): exchanges the refresh cookie for a new access token, returned in the same shape as login. The cookie is **rotated on every call**, so the old one stops working. If a rotated-out token is presented again more than 30 seconds later, it is treated as stolen and all of that user's sessions are ended. Missing, expired, revoked or deactivated-user tokens return `401`.
+- `POST /api/v1/auth/logout`: revokes the refresh cookie (if any) and clears it. Always `204`.
 
 ### Get the current identity
 
@@ -126,7 +133,7 @@ Invoke-RestMethod -Method Patch http://127.0.0.1:8080/api/v1/tasks/$($t.id)/stat
 
 - `POST /api/v1/users` (`TENANT_ADMIN` only; `403` for others): creates an active `MEMBER` in your tenant. Body: `firstName`, `lastName`, `email`, `password` (12-72 chars). Role and tenant are never taken from the request. Duplicate email returns `409`.
 - `GET /api/v1/users`, `GET /api/v1/users/{userId}`: any authenticated user, tenant-scoped (`404` across tenants).
-- `PATCH /api/v1/users/{userId}/deactivate` (`TENANT_ADMIN` only): idempotent; an admin cannot deactivate themselves (`409`). Deactivated users cannot log in or be assigned tasks. An already issued access token stays valid until it expires (15 minutes).
+- `PATCH /api/v1/users/{userId}/deactivate` (`TENANT_ADMIN` only): idempotent; an admin cannot deactivate themselves (`409`). Deactivated users cannot log in or be assigned tasks, and all of their refresh tokens are revoked.
 
 ### Roles and pagination
 
@@ -139,7 +146,7 @@ Invoke-RestMethod -Method Patch http://127.0.0.1:8080/api/v1/tasks/$($t.id)/stat
 - `GET /api/v1/dashboard`: `tasksByStatus`, `overdueTasks` (due before today and not `DONE`), `myOpenTasks` (assigned to you, not `DONE`), `activeProjects`, `archivedProjects`, `activeMembers`. Always scoped to your tenant.
 - **Task permissions:** `TENANT_ADMIN` can change any task. A `MEMBER` can edit a task or change its status only if they created it or are assigned to it; otherwise `403`.
 - **Immediate deactivation:** every request re-checks that the token's user is still active, so a deactivated user's token stops working at once (`401`).
-- **CORS:** browsers may call `/api/**` from the origins in `app.cors.allowed-origins` (default `http://localhost:5173`). `X-Total-Count` is exposed to the browser.
+- **CORS:** browsers may call `/api/**` from the origins in `app.cors.allowed-origins` (default `http://localhost:5173`), with credentials. `X-Total-Count` is exposed to the browser. The refresh cookie is `SameSite=Strict`, so the web app must be served from the same site as the API; in development the Vite dev server proxies `/api` for this.
 
 ## Web app (frontend)
 
@@ -170,22 +177,27 @@ Errors use one JSON shape:
 }
 ```
 
-The API returns `400` for invalid input, `401` for failed/missing authentication, `403` for forbidden access, `404` for a missing resource, `409` for duplicate data, and `500` for unexpected failures.
+The API returns `400` for invalid input, `401` for failed/missing authentication, `403` for forbidden access, `404` for a missing resource, `409` for duplicate data, `429` for too many failed logins, and `500` for unexpected failures.
 
 ## Run tests
 
 ```powershell
-.\mvnw.cmd test "-Dtest=ProjectServiceTests,TaskServiceTests"
+# Unit tests: no database or Docker needed
+.\mvnw.cmd test "-Dtest=*Tests,!*IntegrationTests,!WorksphereApiApplicationTests"
+
+# Everything, including the Testcontainers PostgreSQL integration tests (needs Docker)
+.\mvnw.cmd test
 ```
 
-The Mockito service tests need no database or Docker. The existing Testcontainers integration tests (`AuthFlowIntegrationTests`, `WorksphereApiApplicationTests`) require Docker Desktop and **cannot run on machines without virtualization**; they are kept but were not executed locally.
+CI runs both: a fast unit-test job and a full-suite job (GitHub's Ubuntu runners provide Docker).
 
 ## Security notes
 
 - Access tokens are signed HMAC JWTs and expire after 15 minutes by default.
 - Send tokens only as `Authorization: Bearer <token>`.
 - Use a unique JWT secret of at least 32 bytes; production secrets belong in a secret manager or deployment environment, never Git.
-- The app is stateless: it does not create login sessions or use refresh tokens.
+- Refresh tokens are random 256-bit values. Only their SHA-256 hash is stored (`refresh_tokens` table), they are rotated on every use, and expired ones are deleted daily. The browser keeps them in an `HttpOnly` cookie that scripts cannot read; the web app keeps access tokens in memory only.
+- Apart from refresh tokens, the API is stateless: no server-side HTTP sessions.
 - BCrypt hashes passwords; the raw password and hash are never included in API responses.
 
 ## Manual testing with Postman or VS Code REST Client

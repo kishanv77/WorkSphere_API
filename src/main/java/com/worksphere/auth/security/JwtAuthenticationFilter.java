@@ -23,6 +23,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
 
+    /**
+     * Endpoints that never need an access token. They are skipped here so an expired bearer token sent along
+     * by a client cannot block signing in or refreshing.
+     */
+    public static final String[] PUBLIC_AUTH_PATHS = {
+        "/api/v1/auth/register-tenant", "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout"
+    };
+
     private final JwtService jwtService;
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final UserAccountRepository userAccountRepository;
@@ -34,6 +42,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         this.jwtService = jwtService;
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.userAccountRepository = userAccountRepository;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return "POST".equals(request.getMethod()) && List.of(PUBLIC_AUTH_PATHS).contains(request.getRequestURI());
     }
 
     @Override

@@ -5,6 +5,7 @@ import com.worksphere.common.exception.ConflictException;
 import com.worksphere.common.exception.DuplicateResourceException;
 import com.worksphere.common.exception.InvalidCredentialsException;
 import com.worksphere.common.exception.ResourceNotFoundException;
+import com.worksphere.common.exception.TooManyAttemptsException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -12,6 +13,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -52,6 +54,15 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({InvalidCredentialsException.class, AuthenticationInvalidException.class})
     ResponseEntity<ApiError> handleUnauthorized(RuntimeException exception, HttpServletRequest request) {
         return response(HttpStatus.UNAUTHORIZED, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(TooManyAttemptsException.class)
+    ResponseEntity<ApiError> handleTooManyAttempts(TooManyAttemptsException exception, HttpServletRequest request) {
+        ResponseEntity<ApiError> response =
+                response(HttpStatus.TOO_MANY_REQUESTS, exception.getMessage(), request, Map.of());
+        return ResponseEntity.status(response.getStatusCode())
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(exception.getRetryAfterSeconds()))
+                .body(response.getBody());
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)

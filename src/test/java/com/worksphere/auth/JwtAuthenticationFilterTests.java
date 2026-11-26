@@ -85,4 +85,15 @@ class JwtAuthenticationFilterTests {
         assertNull(chain.getRequest());
         verify(entryPoint).commence(any(), any(), any(BadCredentialsException.class));
     }
+
+    @Test
+    void staleTokenIsIgnoredOnPublicAuthEndpoints() throws Exception {
+        request.setMethod("POST");
+        request.setRequestURI("/api/v1/auth/refresh");
+
+        filter.doFilter(request, response, chain);
+
+        assertNotNull(chain.getRequest());
+        org.mockito.Mockito.verifyNoInteractions(jwtService, entryPoint);
+    }
 }
