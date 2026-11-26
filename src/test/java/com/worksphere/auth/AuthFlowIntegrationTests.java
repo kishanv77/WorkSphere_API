@@ -1,7 +1,7 @@
 package com.worksphere.auth;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 import com.worksphere.PostgreSqlIntegrationTest;
 import com.worksphere.auth.security.JwtPrincipal;
 import com.worksphere.auth.security.JwtService;
@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AuthFlowIntegrationTests extends PostgreSqlIntegrationTest {
 
     @Autowired
-    private ObjectMapper objectMapper;
+    private JsonMapper objectMapper;
 
     @Autowired
     private UserAccountRepository userAccountRepository;
@@ -35,8 +35,8 @@ class AuthFlowIntegrationTests extends PostgreSqlIntegrationTest {
     void registrationCreatesAnActiveTenantAdminWithABcryptHash() throws Exception {
         JsonNode response = register("acme", "admin@acme.test", "CorrectHorseBatteryStaple1!");
 
-        assertEquals("acme", response.path("tenantSlug").asText());
-        assertEquals("TENANT_ADMIN", response.path("role").asText());
+        assertEquals("acme", response.path("tenantSlug").asString());
+        assertEquals("TENANT_ADMIN", response.path("role").asString());
         UserAccount user = userAccountRepository.findByEmailIgnoreCase("admin@acme.test").orElseThrow();
         assertNotEquals("CorrectHorseBatteryStaple1!", user.getPasswordHash());
         assertTrue(passwordEncoder.matches("CorrectHorseBatteryStaple1!", user.getPasswordHash()));
@@ -65,8 +65,8 @@ class AuthFlowIntegrationTests extends PostgreSqlIntegrationTest {
         String token = login("admin@acme.test", "CorrectHorseBatteryStaple1!");
 
         JwtPrincipal principal = jwtService.parseAccessToken(token);
-        assertEquals(registration.path("userId").asText(), principal.userId().toString());
-        assertEquals(registration.path("tenantId").asText(), principal.tenantId().toString());
+        assertEquals(registration.path("userId").asString(), principal.userId().toString());
+        assertEquals(registration.path("tenantId").asString(), principal.tenantId().toString());
         assertEquals("TENANT_ADMIN", principal.role().name());
     }
 
@@ -97,8 +97,8 @@ class AuthFlowIntegrationTests extends PostgreSqlIntegrationTest {
 
         mockMvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.userId").value(registration.path("userId").asText()))
-                .andExpect(jsonPath("$.tenantId").value(registration.path("tenantId").asText()))
+                .andExpect(jsonPath("$.userId").value(registration.path("userId").asString()))
+                .andExpect(jsonPath("$.tenantId").value(registration.path("tenantId").asString()))
                 .andExpect(jsonPath("$.email").value("admin@acme.test"))
                 .andExpect(jsonPath("$.firstName").value("Ada"))
                 .andExpect(jsonPath("$.lastName").value("Lovelace"))
@@ -123,7 +123,7 @@ class AuthFlowIntegrationTests extends PostgreSqlIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
                 .andReturn();
-        return objectMapper.readTree(result.getResponse().getContentAsString()).path("accessToken").asText();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).path("accessToken").asString();
     }
 
     private String registrationBody(String slug, String email, String password) {

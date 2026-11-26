@@ -39,7 +39,6 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import tools.jackson.databind.json.JsonMapper;
-import org.springframework.http.converter.HttpMessageNotReadableException;
 
 @ExtendWith(MockitoExtension.class)
 class TaskServiceTests {
