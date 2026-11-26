@@ -37,3 +37,6 @@ build/
 .env.*
 
 *.log
+
+### Stray scaffold folder from the initial commit (not part of the project) ###
+/WorkSphere/

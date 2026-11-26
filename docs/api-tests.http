@@ -35,6 +35,10 @@ Content-Type: application/json
 GET {{baseUrl}}/api/v1/auth/me
 Authorization: Bearer {{tokenA}}
 
+### 3a. Refresh: REST Client resends the ws_refresh cookie from login (it rotates on each call).
+### The cookie is Secure; if your client won't send it over plain http, start the API with REFRESH_COOKIE_SECURE=false.
+POST {{baseUrl}}/api/v1/auth/refresh
+
 ### 4. Create project
 # @name createProject
 POST {{baseUrl}}/api/v1/projects

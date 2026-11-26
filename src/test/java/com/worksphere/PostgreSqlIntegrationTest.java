@@ -1,9 +1,8 @@
 package com.worksphere;
 
-import com.worksphere.tenant.repository.TenantRepository;
-import com.worksphere.user.repository.UserAccountRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -33,10 +32,7 @@ public abstract class PostgreSqlIntegrationTest {
     protected PasswordEncoder passwordEncoder;
 
     @Autowired
-    private UserAccountRepository userAccountRepository;
-
-    @Autowired
-    private TenantRepository tenantRepository;
+    private JdbcTemplate jdbcTemplate;
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
@@ -46,9 +42,15 @@ public abstract class PostgreSqlIntegrationTest {
         registry.add("app.security.jwt.secret", () -> TEST_JWT_SECRET);
     }
 
+    /** Empties every application table (child rows included) so each test starts clean. */
     @BeforeEach
     void clearDatabase() {
-        userAccountRepository.deleteAll();
-        tenantRepository.deleteAll();
+        String tables = String.join(", ", jdbcTemplate.queryForList(
+                "SELECT quote_ident(tablename) FROM pg_tables "
+                        + "WHERE schemaname = current_schema() AND tablename <> 'flyway_schema_history'",
+                String.class));
+        if (!tables.isEmpty()) {
+            jdbcTemplate.execute("TRUNCATE TABLE " + tables + " CASCADE");
+        }
     }
 }

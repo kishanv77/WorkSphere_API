@@ -12,7 +12,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173. The app talks to `http://127.0.0.1:8080` by default; override it with a `VITE_API_URL` environment variable (for example in a git-ignored `.env.local`).
+Open http://localhost:5173. The dev server proxies `/api` and `/actuator` to `http://127.0.0.1:8080`, so the app and API share one origin; point the proxy elsewhere with an `API_PROXY_TARGET` environment variable. In production, serve the built app and the API from the same site (the refresh cookie is `SameSite=Strict`). `VITE_API_URL` still overrides the API base URL, but a cross-site URL breaks session refresh.
 
 ## Screens
 
@@ -26,5 +26,5 @@ Permissions mirror the API: only admins manage projects and users, and members c
 
 ## Notes
 
-- The access token is kept in `localStorage`. When it expires or the user is deactivated, the API returns 401 and the app returns to the sign-in screen.
+- The access token (15 minutes) is kept only in memory. The refresh token lives in an httpOnly cookie that scripts cannot read. When an API call gets a 401, the app refreshes once and retries; reloading the page restores the session the same way. If refreshing fails (signed out, session older than 7 days, or user deactivated), the app returns to the sign-in screen.
 - `npm run build` type-checks and builds; `npm run lint` runs oxlint.

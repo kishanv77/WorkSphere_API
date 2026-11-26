@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.worksphere.auth.security.JwtPrincipal;
+import com.worksphere.auth.service.RefreshTokenService;
 import com.worksphere.common.exception.ConflictException;
 import com.worksphere.common.exception.DuplicateResourceException;
 import com.worksphere.common.exception.ResourceNotFoundException;
@@ -46,6 +47,9 @@ class UserManagementServiceTests {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private RefreshTokenService refreshTokenService;
+
     private UserManagementService service;
     private Tenant tenant;
     private UserAccount admin;
@@ -53,7 +57,8 @@ class UserManagementServiceTests {
 
     @BeforeEach
     void setUp() {
-        service = new UserManagementService(userAccountRepository, tenantRepository, passwordEncoder);
+        service = new UserManagementService(
+                userAccountRepository, tenantRepository, passwordEncoder, refreshTokenService);
         tenant = Tenant.createActiveFree("Acme", "acme");
         admin = UserAccount.createActiveTenantAdmin(tenant, "Ada", "Admin", "ada@acme.test", "hash");
         principal = new JwtPrincipal(admin.getId(), tenant.getId(), UserRole.TENANT_ADMIN);
@@ -110,6 +115,7 @@ class UserManagementServiceTests {
         assertEquals(UserStatus.INACTIVE, service.deactivate(principal, member.getId()).status());
         assertEquals(UserStatus.INACTIVE, service.deactivate(principal, member.getId()).status());
         assertNotEquals(admin.getId(), member.getId());
+        verify(refreshTokenService, org.mockito.Mockito.times(2)).revokeAllFor(member.getId());
     }
 
     @Test

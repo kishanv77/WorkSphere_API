@@ -1,27 +1,26 @@
-const BASE: string = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8080'
-const TOKEN_KEY = 'worksphere.token'
+// Same-origin by default: in development Vite proxies /api to the backend (see vite.config.ts).
+const BASE: string = import.meta.env.VITE_API_URL ?? ''
+
+// Tokens issued before refresh tokens existed were kept here; remove them.
+try {
+  localStorage.removeItem('worksphere.token')
+} catch {
+  /* storage unavailable */
+}
+
+/**
+ * The access token lives only in memory, so injected scripts cannot lift it from storage.
+ * After a reload the session is restored from the httpOnly refresh cookie via refreshSession().
+ */
+let accessToken: string | null = null
 
 export const tokenStore = {
-  get(): string | null {
-    try {
-      return localStorage.getItem(TOKEN_KEY)
-    } catch {
-      return null
-    }
-  },
+  get: (): string | null => accessToken,
   set(token: string) {
-    try {
-      localStorage.setItem(TOKEN_KEY, token)
-    } catch {
-      /* storage unavailable: the session just won't survive a reload */
-    }
+    accessToken = token
   },
   clear() {
-    try {
-      localStorage.removeItem(TOKEN_KEY)
-    } catch {
-      /* ignore */
-    }
+    accessToken = null
   },
 }
 
@@ -49,23 +48,27 @@ interface Result<T> {
   total: number | null
 }
 
-async function request<T>(path: string, method = 'GET', body?: unknown): Promise<Result<T>> {
+interface LoginResponse {
+  accessToken: string
+}
+
+async function send(path: string, method: string, body: unknown, token: string | null): Promise<Response> {
   const headers: Record<string, string> = {}
-  const token = tokenStore.get()
   if (token) headers.Authorization = `Bearer ${token}`
   if (body !== undefined) headers['Content-Type'] = 'application/json'
-
-  let response: Response
   try {
-    response = await fetch(BASE + path, {
+    return await fetch(BASE + path, {
       method,
       headers,
+      credentials: 'include',
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
   } catch {
-    throw new ApiError(0, 'Cannot reach the server. Is the API running on ' + BASE + '?')
+    throw new ApiError(0, 'Cannot reach the server. Is the API running?')
   }
+}
 
+async function parse<T>(response: Response): Promise<Result<T>> {
   const text = await response.text()
   let json: { message?: string; fieldErrors?: Record<string, string> } | null = null
   try {
@@ -73,17 +76,62 @@ async function request<T>(path: string, method = 'GET', body?: unknown): Promise
   } catch {
     json = null
   }
-
   if (!response.ok) {
-    if (response.status === 401 && token) {
+    throw new ApiError(response.status, json?.message ?? response.statusText, json?.fieldErrors ?? {})
+  }
+  const totalHeader = response.headers.get('X-Total-Count')
+  return { data: json as T, total: totalHeader ? Number(totalHeader) : null }
+}
+
+const PUBLIC_AUTH_PATHS = new Set([
+  '/api/v1/auth/login',
+  '/api/v1/auth/register-tenant',
+  '/api/v1/auth/refresh',
+  '/api/v1/auth/logout',
+])
+
+let refreshInFlight: Promise<boolean> | null = null
+
+async function attemptRefresh(): Promise<boolean> {
+  const response = await send('/api/v1/auth/refresh', 'POST', undefined, null)
+  if (!response.ok) return false
+  const { data } = await parse<LoginResponse>(response)
+  tokenStore.set(data.accessToken)
+  return true
+}
+
+/**
+ * Gets a new access token from the refresh cookie. Concurrent callers share one request, because each
+ * refresh rotates the cookie. If another tab rotated it at the same moment, one retry picks up the new cookie.
+ */
+export function refreshSession(): Promise<boolean> {
+  refreshInFlight ??= (async () => {
+    try {
+      return (await attemptRefresh()) || (await attemptRefresh())
+    } catch {
+      return false
+    } finally {
+      refreshInFlight = null
+    }
+  })()
+  return refreshInFlight
+}
+
+async function request<T>(path: string, method = 'GET', body?: unknown): Promise<Result<T>> {
+  const token = tokenStore.get()
+  let response = await send(path, method, body, token)
+
+  // The access token is short-lived: on 401, refresh once and retry before giving up.
+  if (response.status === 401 && token && !PUBLIC_AUTH_PATHS.has(path)) {
+    if (await refreshSession()) {
+      response = await send(path, method, body, tokenStore.get())
+    }
+    if (response.status === 401) {
       tokenStore.clear()
       window.dispatchEvent(new Event('auth:expired'))
     }
-    throw new ApiError(response.status, json?.message ?? response.statusText, json?.fieldErrors ?? {})
   }
-
-  const totalHeader = response.headers.get('X-Total-Count')
-  return { data: json as T, total: totalHeader ? Number(totalHeader) : null }
+  return parse<T>(response)
 }
 
 export const api = {
